@@ -514,13 +514,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.grey[850],
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
                 child: Text(
                   'Aucun historique',
-                  style: TextStyle(color: Colors.grey[400]),
+                  style: TextStyle(color: Colors.grey.shade600),
                 ),
               ),
             )
@@ -534,77 +534,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final color = _getStatutColor(cotisation.statutPaiement);
                 final borderColor = _getBorderColor(cotisation.statutPaiement);
 
-                return Container(
+                return Card(
+                  elevation: 2,
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[850],
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
+                    side: BorderSide(
                       color: borderColor,
                       width: 2,
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      // Icône à gauche
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: borderColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.receipt,
-                          color: borderColor,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      // Montant et date
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              cotisation.formattedMontant,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${cotisation.dateCreation.year}-${cotisation.dateCreation.month.toString().padLeft(2, '0')}-${cotisation.dateCreation.day.toString().padLeft(2, '0')}T${cotisation.dateCreation.hour.toString().padLeft(2, '0')}:${cotisation.dateCreation.minute.toString().padLeft(2, '0')}:${cotisation.dateCreation.second.toString().padLeft(2, '0')}.000Z',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Statut à droite
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _getStatutLabel(cotisation.statutPaiement),
-                          style: TextStyle(
-                            color: color,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        // Icône à gauche
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: borderColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.receipt,
+                            color: borderColor,
+                            size: 28,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 16),
+                        // Montant et date
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cotisation.formattedMontant,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${cotisation.dateCreation.day.toString().padLeft(2, '0')}/${cotisation.dateCreation.month.toString().padLeft(2, '0')}/${cotisation.dateCreation.year}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Statut à droite
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _getStatutLabel(cotisation.statutPaiement),
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

@@ -149,7 +149,7 @@ class Membre {
       dateInscription: json['date_inscription'] != null
           ? DateTime.parse(json['date_inscription'])
           : DateTime.now(),
-      rating: json['rating'] ?? 0,
+      rating: _parseRating(json['rating']),
     );
   }
 
@@ -163,5 +163,13 @@ class Membre {
       age--;
     }
     return age;
+  }
+
+  static int _parseRating(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 }

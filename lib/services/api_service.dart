@@ -41,6 +41,87 @@ class ApiService {
     );
   }
 
+  /// Vérifier le NIN pour la récupération de mot de passe
+  Future<Map<String, dynamic>> verifyNin(String nin) async {
+    try {
+      final response = await _dio.post(
+        '/auth/verify-nin',
+        data: {'nin': nin},
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': response.data['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'NIN non trouvé',
+        };
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return {
+          'success': false,
+          'message': e.response?.data['message'] ?? 'NIN non trouvé',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Impossible de se connecter au serveur',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Une erreur inattendue est survenue: $e',
+      };
+    }
+  }
+
+  /// Réinitialiser le mot de passe avec le NIN
+  Future<Map<String, dynamic>> resetPassword(String nin, String newPassword) async {
+    try {
+      final response = await _dio.post(
+        '/auth/reset-password',
+        data: {
+          'nin': nin,
+          'new_password': newPassword,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Mot de passe réinitialisé avec succès',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Erreur lors de la réinitialisation',
+        };
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return {
+          'success': false,
+          'message': e.response?.data['message'] ?? 'Erreur serveur',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Impossible de se connecter au serveur',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Une erreur inattendue est survenue: $e',
+      };
+    }
+  }
+
   /// Connexion d'un membre
   Future<Map<String, dynamic>> login(String identifier, String password) async {
     try {

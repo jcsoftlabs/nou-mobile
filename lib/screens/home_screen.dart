@@ -87,8 +87,19 @@ class _HomeScreenState extends State<HomeScreen> {
     if (result['success'] == true) {
       final annonces = (result['data'] as List<Annonce>?) ?? <Annonce>[];
       await _updateAnnonceUnreadState(annonces);
+      final topAnnonce = _selectTopAnnonce(annonces);
+      
+      // Vérifier si cette annonce a été fermée
+      bool isDismissed = false;
+      if (topAnnonce != null) {
+        final prefs = await SharedPreferences.getInstance();
+        final dismissedIds = prefs.getStringList('dismissed_annonces') ?? [];
+        isDismissed = dismissedIds.contains(topAnnonce.id.toString());
+      }
+      
       setState(() {
-        _topAnnonce = _selectTopAnnonce(annonces);
+        _topAnnonce = topAnnonce;
+        _isAnnonceDismissed = isDismissed;
         _isLoadingAnnonces = false;
       });
     } else {
@@ -387,13 +398,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 6),
                 // Affichage du rating par étoiles
                 Row(
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      index < membre.rating ? Icons.star : Icons.star_border,
-                      color: Colors.amber.shade300,
-                      size: 18,
-                    );
-                  }),
+                  children: [
+                    ...List.generate(5, (index) {
+                      return Icon(
+                        index < membre.rating ? Icons.star : Icons.star_border,
+                        color: Colors.amber.shade300,
+                        size: 18,
+                      );
+                    }),
+                    const SizedBox(width: 8),
+                    Text(
+                      '(${membre.rating}/5)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -497,7 +518,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                               color: Colors.grey,
-                              onPressed: () {
+                              onPressed: () async {
+                                // Sauvegarder l'ID de l'annonce fermée
+                                final prefs = await SharedPreferences.getInstance();
+                                final dismissedIds = prefs.getStringList('dismissed_annonces') ?? [];
+                                dismissedIds.add(annonce.id.toString());
+                                await prefs.setStringList('dismissed_annonces', dismissedIds);
+                                
                                 setState(() {
                                   _isAnnonceDismissed = true;
                                 });

@@ -5,6 +5,7 @@ import '../data/providers/auth_provider.dart';
 import '../screens/splash_screen.dart';
 import '../screens/welcome_screen.dart';
 import '../screens/login_screen.dart';
+import '../screens/forgot_password_screen.dart';
 import '../screens/inscription_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/app_shell.dart';
@@ -65,7 +66,8 @@ class AppRouter {
         final location = state.matchedLocation;
         final isPublicRoute = location.startsWith('/welcome') ||
             location.startsWith('/login') ||
-            location.startsWith('/register');
+            location.startsWith('/register') ||
+            location.startsWith('/forgot-password');
 
         // Si non authentifié et essaie d'accéder à une route protégée
         if (!isAuthenticated && !isPublicRoute) {
@@ -103,6 +105,12 @@ class AppRouter {
         GoRoute(
           path: '/register',
           pageBuilder: (context, state) => _buildPage(const InscriptionScreen()),
+        ),
+
+        // Forgot Password
+        GoRoute(
+          path: '/forgot-password',
+          pageBuilder: (context, state) => _buildPage(const ForgotPasswordScreen()),
         ),
 
         // Home (protégé)

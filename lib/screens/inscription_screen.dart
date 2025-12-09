@@ -7,6 +7,7 @@ import '../models/register_request.dart';
 import '../utils/validators.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_dropdown.dart';
+import '../constants/haiti_locations.dart';
 import 'qr_scanner_screen.dart';
 
 class InscriptionScreen extends StatefulWidget {
@@ -73,6 +74,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
   bool _aVioleLoiDrogue = false;
   bool _aParticipeActiviteTerroriste = false;
   String? _photoProfilUrl;
+  bool _accepteConditions = false;
 
   @override
   void dispose() {
@@ -205,6 +207,16 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
 
   Future<void> _submitForm() async {
     if (!_formKey2.currentState!.validate()) {
+      return;
+    }
+
+    if (!_accepteConditions) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vous devez accepter les conditions d\'utilisation pour continuer'),
+          backgroundColor: Colors.red,
+        ),
+      );
       return;
     }
 
@@ -643,7 +655,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
             const SizedBox(height: 16),
             CustomTextField(
               controller: _ninController,
-              hintText: 'NIN',
+              hintText: 'Numéro d\'Identification National',
               validator: (value) => Validators.validateNIN(value),
             ),
             const SizedBox(height: 16),
@@ -752,19 +764,24 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 'Sud',
                 'Sud-Est'
               ],
-              onChanged: (value) => setState(() => _departement = value),
+              onChanged: (value) {
+                setState(() {
+                  _departement = value;
+                  // Réinitialiser la commune quand on change de département
+                  _commune = null;
+                });
+              },
               validator: (value) =>
                   Validators.validateRequired(value, 'Le département'),
             ),
             const SizedBox(height: 16),
-            CustomTextField(
-              controller: _commune != null
-                  ? TextEditingController(text: _commune)
-                  : TextEditingController(),
+            CustomDropdown(
+              value: _commune,
               hintText: 'Commune',
+              items: HaitiLocations.getCommunesByDepartment(_departement),
+              onChanged: (value) => setState(() => _commune = value),
               validator: (value) =>
                   Validators.validateRequired(value, 'La commune'),
-              onChanged: (value) => _commune = value,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -908,6 +925,45 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               (value) => setState(() => _aParticipeActiviteTerroriste = value),
             ),
             const SizedBox(height: 40),
+            // Case à cocher pour les conditions d'utilisation
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _accepteConditions ? Colors.green : Colors.grey.shade300,
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Checkbox(
+                    value: _accepteConditions,
+                    onChanged: (value) {
+                      setState(() {
+                        _accepteConditions = value ?? false;
+                      });
+                    },
+                    activeColor: const Color(0xFFFF0000),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        'Je certifie avoir lu et compris toutes les questions, que mes informations sont fiables et j\'accepte de signer ce formulaire sans contrainte.',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             // Boutons de navigation
             Row(
               children: [
