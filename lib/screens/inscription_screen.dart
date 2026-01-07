@@ -885,30 +885,6 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 24),
-                      child: IconButton(
-                        onPressed: _isVerifyingCode ? null : _verifyCodeAdhesion,
-                        icon: _isVerifyingCode
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Icon(Icons.check_circle_outline, size: 28),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.all(12),
-                        ),
-                        tooltip: 'Vérifier le code',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
                     Container(
                       margin: const EdgeInsets.only(bottom: 24),
                       child: IconButton(
