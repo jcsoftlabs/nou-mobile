@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:provider/provider.dart';
+import 'dart:async';
 import '../models/cotisation.dart';
 import '../models/cotisation_status.dart';
 import '../services/api_service.dart';
+import '../services/payment_service.dart';
+import '../services/notification_service.dart';
+import '../data/providers/auth_provider.dart';
 import '../widgets/gradient_app_bar.dart';
 import 'payment_screen.dart';
 
@@ -30,6 +35,7 @@ class _CotisationScreenState extends State<CotisationScreen> {
   bool _isLoading = false;
   bool _showHistory = false;
   double? _montantSaisi;
+  Timer? _pendingPaymentTimer;
 
   @override
   void initState() {
@@ -40,6 +46,7 @@ class _CotisationScreenState extends State<CotisationScreen> {
   @override
   void dispose() {
     _montantController.dispose();
+    _pendingPaymentTimer?.cancel();
     super.dispose();
   }
 
@@ -106,6 +113,81 @@ class _CotisationScreenState extends State<CotisationScreen> {
     }
     
     return null; // Valide
+  }
+
+  void _startPendingPaymentCheck(String referenceId) {
+    _pendingPaymentTimer?.cancel();
+    
+    _pendingPaymentTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.token;
+      
+      if (token == null) {
+        timer.cancel();
+        return;
+      }
+      
+      try {
+        final result = await PaymentService().checkPaymentStatus(
+          token: token,
+          referenceId: referenceId,
+        );
+        
+        if (result['success']) {
+          final status = result['data']['status'];
+          
+          if (status == 'completed') {
+            timer.cancel();
+            
+            // Afficher notification
+            await NotificationService.showPaymentConfirmed(
+              result['data']['montant'] ?? 0.0,
+              'cotisation',
+            );
+            
+            // Rafraîchir
+            await _loadCotisationStatus();
+            
+            // Afficher snackbar
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text('Votre paiement a été confirmé !'),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            }
+          } else if (status == 'failed') {
+            timer.cancel();
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Row(
+                    children: [
+                      Icon(Icons.error, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text('Votre paiement a échoué.'),
+                    ],
+                  ),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            }
+          }
+        }
+      } catch (e) {
+        // Ignorer les erreurs de vérification
+      }
+    });
   }
 
   Future<void> _payWithMonCash() async {
@@ -609,11 +691,69 @@ class _CotisationScreenState extends State<CotisationScreen> {
                   ),
                 );
 
-                // Si le paiement est réussi, recharger les données
-                if (result == true) {
-                  _montantController.clear();
-                  _montantSaisi = null;
-                  _loadCotisationStatus();
+                // Gérer le résultat du paiement
+                if (result != null && result is Map<String, dynamic>) {
+                  final status = result['status'];
+                  
+                  if (status == 'completed') {
+                    // ✅ Paiement réussi
+                    _montantController.clear();
+                    _montantSaisi = null;
+                    
+                    // Rafraîchir immédiatement
+                    await _loadCotisationStatus();
+                    
+                    // Afficher message de succès
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.check_circle, color: Colors.white),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Paiement de ${result['montant'].toStringAsFixed(2)} HTG effectué avec succès !',
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  } else if (status == 'pending') {
+                    // ⏳ Paiement en attente
+                    _montantController.clear();
+                    _montantSaisi = null;
+                    
+                    // Rafraîchir quand même (le paiement apparaîtra comme "en attente")
+                    await _loadCotisationStatus();
+                    
+                    // Démarrer vérification périodique
+                    _startPendingPaymentCheck(result['reference_id']);
+                    
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Row(
+                            children: [
+                              Icon(Icons.schedule, color: Colors.white),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Paiement en cours de traitement. Vous serez notifié dès confirmation.',
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 5),
+                        ),
+                      );
+                    }
+                  }
                 }
               },
               icon: const Icon(Icons.payment, size: 28),

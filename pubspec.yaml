@@ -80,6 +80,9 @@ dependencies:
   
   # WebView for payment redirection
   webview_flutter: ^4.10.0
+  
+  # Local notifications for payment confirmation
+  flutter_local_notifications: ^18.0.1
 
 dev_dependencies:
   flutter_test:

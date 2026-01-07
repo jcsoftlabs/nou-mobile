@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../data/providers/auth_provider.dart';
 import '../services/payment_service.dart';
+import '../services/notification_service.dart';
 import 'dart:async';
 
 class PaymentScreen extends StatefulWidget {
@@ -158,6 +159,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   void _showSuccessDialog() {
+    // Afficher notification locale
+    NotificationService.showPaymentSuccess(widget.montant, widget.type);
+    
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -176,7 +180,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(); // Fermer dialog
-              Navigator.of(context).pop(true); // Retourner avec succès
+              Navigator.of(context).pop({
+                'success': true,
+                'status': 'completed',
+                'montant': widget.montant,
+                'reference_id': _referenceId,
+              }); // Retourner avec succès
             },
             child: const Text('OK'),
           ),
@@ -202,7 +211,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop(); // Fermer dialog
-              Navigator.of(context).pop(false); // Retourner avec échec
+              Navigator.of(context).pop({
+                'success': false,
+                'status': 'failed',
+                'message': message,
+              }); // Retourner avec échec
             },
             child: const Text('OK'),
           ),
@@ -212,6 +225,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   void _showPendingDialog() {
+    // Afficher notification locale
+    NotificationService.showPaymentPending(widget.montant);
+    
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -223,14 +239,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
             Text('Paiement en attente'),
           ],
         ),
-        content: const Text(
-          'Votre paiement est en cours de traitement. Vous recevrez une notification une fois confirmé.',
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Votre paiement est en cours de traitement.'),
+            SizedBox(height: 12),
+            Text('Nous continuerons à vérifier le statut en arrière-plan.'),
+            SizedBox(height: 8),
+            Text(
+              'Vous recevrez une notification dès confirmation.',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop(); // Fermer dialog
-              Navigator.of(context).pop(null); // Retourner avec statut pending
+              Navigator.of(context).pop(); // Fermer dialogue
+              Navigator.of(context).pop({
+                'success': false,
+                'status': 'pending',
+                'montant': widget.montant,
+                'reference_id': _referenceId,
+              }); // Retourner avec statut pending
             },
             child: const Text('OK'),
           ),
