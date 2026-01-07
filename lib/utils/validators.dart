@@ -103,9 +103,14 @@ class Validators {
     if (value == null || value.isEmpty) {
       return required ? 'Le NIN est obligatoire' : null;
     }
-    if (value.length < 10) {
-      return 'NIN invalide';
+    
+    // Extraire uniquement les chiffres
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    
+    if (digits.length < 9) {
+      return 'Le NIN doit contenir au moins 9 chiffres';
     }
+    
     return null;
   }
 
