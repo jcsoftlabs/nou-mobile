@@ -1166,6 +1166,10 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
             CustomTextField(
               controller: _ninController,
               hintText: 'Numéro d\'Identification National',
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly, // Uniquement des chiffres
+              ],
               validator: (value) => Validators.validateNIN(value),
               isRequired: true,
               onChanged: (value) {
