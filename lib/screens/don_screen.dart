@@ -46,21 +46,27 @@ class _DonScreenState extends State<DonScreen> {
   Future<void> _loadDonHistory() async {
     setState(() => _isLoading = true);
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final membreId = authProvider.currentMembre?.id;
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final membreId = authProvider.currentMembre?.id;
 
-    if (membreId != null) {
-      final result = await _apiService.getDonsByMembre(membreId);
-      if (result['success']) {
-        setState(() {
-          _historique = (result['data'] as List)
-              .map((json) => Don.fromJson(json))
-              .toList();
-        });
+      if (membreId != null) {
+        final result = await _apiService.getDonsByMembre(membreId);
+        if (result['success']) {
+          setState(() {
+            _historique = (result['data'] as List)
+                .map((json) => Don.fromJson(json))
+                .toList();
+          });
+        } else {
+          print('Erreur chargement dons: ${result['message']}');
+        }
       }
+    } catch (e) {
+      print('Exception chargement dons: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
-
-    setState(() => _isLoading = false);
   }
 
   void _startPendingPaymentCheck(String referenceId) {
