@@ -805,6 +805,47 @@ class ApiService {
     }
   }
 
+  /// Récupérer l'historique des dons d'un membre
+  Future<Map<String, dynamic>> getDonsByMembre(int membreId) async {
+    try {
+      final response = await _dio.get(
+        '/api/dons/membre/$membreId',
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${await _storage.read(key: 'token')}',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        return {
+          'success': true,
+          'data': response.data['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': response.data['message'] ?? 'Erreur lors de la récupération des dons',
+        };
+      }
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return {
+          'success': false,
+          'message': e.response!.data['message'] ?? 'Erreur serveur',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Erreur de connexion au serveur',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Erreur: $e'};
+    }
+  }
+
   /// Récupérer les points cumulés d'un membre
   Future<Map<String, dynamic>> getPoints(int membreId) async {
     try {
