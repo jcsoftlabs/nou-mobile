@@ -189,7 +189,10 @@ class AppRouter {
         // Don (protégé)
         GoRoute(
           path: '/don',
-          pageBuilder: (context, state) => _buildPage(const DonScreen()),
+          pageBuilder: (context, state) => _buildPage(const AppShell(
+            currentIndex: 0,
+            child: DonScreen(),
+          )),
         ),
 
         // News (protégé)
