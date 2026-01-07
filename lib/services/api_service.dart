@@ -811,10 +811,7 @@ class ApiService {
       final response = await _dio.get(
         '/api/dons/membre/$membreId',
         options: Options(
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${await _storage.read(key: 'token')}',
-          },
+          headers: await _getAuthHeaders(),
         ),
       );
 
