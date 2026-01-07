@@ -808,12 +808,7 @@ class ApiService {
   /// Récupérer l'historique des dons d'un membre
   Future<Map<String, dynamic>> getDonsByMembre(int membreId) async {
     try {
-      final response = await _dio.get(
-        '/api/dons/membre/$membreId',
-        options: Options(
-          headers: await _getAuthHeaders(),
-        ),
-      );
+      final response = await _dio.get('/api/dons/membre/$membreId');
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         return {
