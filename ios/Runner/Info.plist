@@ -51,9 +51,12 @@
 	<string>Nous avons besoin d'accéder à vos photos pour sauvegarder les QR codes</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Nous avons besoin d'accéder à vos photos pour sauvegarder les QR codes</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Nous envoyons des notifications pour vous informer de la confirmation de vos paiements</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<string>remote-notification</string>
 	</array>
 </dict>
 </plist>
