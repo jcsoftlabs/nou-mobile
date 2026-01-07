@@ -126,10 +126,22 @@ class AuthProvider with ChangeNotifier {
         }
       }
 
+      // ⚠️ FIX: Réinitialiser l'état d'authentification en cas d'échec
+      _isAuthenticated = false;
+      _currentMembre = null;
+      _token = null;
+      _refreshToken = null;
+
       // NE PAS appeler notifyListeners() en cas d'échec pour éviter
       // que le router force une redirection
       return {'success': false, 'message': response['message'] ?? 'Erreur de connexion'};
     } catch (e) {
+      // ⚠️ FIX: Réinitialiser l'état d'authentification en cas d'exception
+      _isAuthenticated = false;
+      _currentMembre = null;
+      _token = null;
+      _refreshToken = null;
+      
       // NE PAS appeler notifyListeners() en cas d'erreur
       return {'success': false, 'message': 'Erreur: $e'};
     }
@@ -193,18 +205,48 @@ class AuthProvider with ChangeNotifier {
           notifyListeners();
 
           return {'success': true, 'message': 'Inscription réussie'};
+        } else {
+          // ⚠️ FIX: Si membre est null malgré success=true, c'est une erreur
+          _isAuthenticated = false;
+          _currentMembre = null;
+          _token = null;
+          _refreshToken = null;
+          
+          _isLoading = false;
+          notifyListeners();
+          
+          return {
+            'success': false,
+            'message': 'Erreur: données du membre manquantes',
+          };
         }
       }
 
+      // ⚠️ FIX: Réinitialiser l'état d'authentification en cas d'échec
+      _isAuthenticated = false;
+      _currentMembre = null;
+      _token = null;
+      _refreshToken = null;
+      
       _isLoading = false;
       notifyListeners();
+      
       return {
         'success': false,
         'message': response['message'] ?? 'Erreur lors de l\'inscription',
+        'errorType': response['errorType'],
+        'fieldErrors': response['fieldErrors'],
       };
     } catch (e) {
+      // ⚠️ FIX: Réinitialiser l'état d'authentification en cas d'exception
+      _isAuthenticated = false;
+      _currentMembre = null;
+      _token = null;
+      _refreshToken = null;
+      
       _isLoading = false;
       notifyListeners();
+      
       return {'success': false, 'message': 'Erreur: $e'};
     }
   }
