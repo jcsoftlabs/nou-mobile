@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +37,28 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
   bool? _codeAdhesionValid;
   bool _isVerifyingCode = false;
   String? _codeVerificationMessage;
+  
+  // États de validation en temps réel
+  bool? _usernameAvailable;
+  bool _isVerifyingUsername = false;
+  String? _usernameMessage;
+  List<String> _usernameSuggestions = [];
+  Timer? _usernameDebounce;
+  
+  bool? _emailAvailable;
+  bool _isVerifyingEmail = false;
+  String? _emailMessage;
+  Timer? _emailDebounce;
+  
+  bool? _phoneAvailable;
+  bool _isVerifyingPhone = false;
+  String? _phoneMessage;
+  Timer? _phoneDebounce;
+  
+  bool? _ninAvailable;
+  bool _isVerifyingNin = false;
+  String? _ninMessage;
+  Timer? _ninDebounce;
 
   // Contrôleurs Étape 1
   final _usernameController = TextEditingController();
@@ -88,6 +111,10 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
 
   @override
   void dispose() {
+    _usernameDebounce?.cancel();
+    _emailDebounce?.cancel();
+    _phoneDebounce?.cancel();
+    _ninDebounce?.cancel();
     _usernameController.dispose();
     _codeAdhesionController.dispose();
     _passwordController.dispose();
@@ -216,6 +243,132 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
         _codeAdhesionValid = false;
         _codeVerificationMessage = 'Erreur lors de la vérification';
         _isVerifyingCode = false;
+      });
+    }
+  }
+
+  Future<void> _verifyUsername(String username) async {
+    if (username.isEmpty || username.length < 3) {
+      setState(() {
+        _usernameAvailable = null;
+        _usernameMessage = null;
+        _usernameSuggestions = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifyingUsername = true;
+    });
+
+    try {
+      final apiService = ApiService();
+      final result = await apiService.checkUsernameAvailability(username);
+      
+      setState(() {
+        _usernameAvailable = result['available'] == true;
+        _usernameMessage = result['message'];
+        _usernameSuggestions = (result['suggestions'] as List?)?.cast<String>() ?? [];
+        _isVerifyingUsername = false;
+      });
+    } catch (e) {
+      setState(() {
+        _usernameAvailable = null;
+        _usernameMessage = null;
+        _isVerifyingUsername = false;
+      });
+    }
+  }
+
+  Future<void> _verifyEmail(String email) async {
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() {
+        _emailAvailable = null;
+        _emailMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifyingEmail = true;
+    });
+
+    try {
+      final apiService = ApiService();
+      final result = await apiService.checkEmailAvailability(email);
+      
+      setState(() {
+        _emailAvailable = result['available'] == true;
+        _emailMessage = result['message'];
+        _isVerifyingEmail = false;
+      });
+    } catch (e) {
+      setState(() {
+        _emailAvailable = null;
+        _emailMessage = null;
+        _isVerifyingEmail = false;
+      });
+    }
+  }
+
+  Future<void> _verifyPhone(String phone) async {
+    if (phone.isEmpty || phone.length < 8) {
+      setState(() {
+        _phoneAvailable = null;
+        _phoneMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifyingPhone = true;
+    });
+
+    try {
+      final apiService = ApiService();
+      final result = await apiService.checkPhoneAvailability(phone);
+      
+      setState(() {
+        _phoneAvailable = result['available'] == true;
+        _phoneMessage = result['message'];
+        _isVerifyingPhone = false;
+      });
+    } catch (e) {
+      setState(() {
+        _phoneAvailable = null;
+        _phoneMessage = null;
+        _isVerifyingPhone = false;
+      });
+    }
+  }
+
+  Future<void> _verifyNin(String nin) async {
+    if (nin.isEmpty || nin.length < 5) {
+      setState(() {
+        _ninAvailable = null;
+        _ninMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifyingNin = true;
+    });
+
+    try {
+      final apiService = ApiService();
+      final result = await apiService.checkNinAvailability(nin);
+      
+      setState(() {
+        _ninAvailable = result['available'] == true;
+        _ninMessage = result['message'];
+        _isVerifyingNin = false;
+      });
+    } catch (e) {
+      setState(() {
+        _ninAvailable = null;
+        _ninMessage = null;
+        _isVerifyingNin = false;
       });
     }
   }
@@ -541,7 +694,89 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               helperText: 'Lettres, chiffres et _ uniquement',
               validator: Validators.validateUsername,
               isRequired: true,
+              onChanged: (value) {
+                // Annuler le timer précédent
+                _usernameDebounce?.cancel();
+                
+                // Réinitialiser l'état si le champ est vide
+                if (value.isEmpty || value.length < 3) {
+                  setState(() {
+                    _usernameAvailable = null;
+                    _usernameMessage = null;
+                    _usernameSuggestions = [];
+                  });
+                  return;
+                }
+                
+                // Créer un nouveau timer de 800ms
+                _usernameDebounce = Timer(const Duration(milliseconds: 800), () {
+                  _verifyUsername(value);
+                });
+              },
+              suffixIcon: _isVerifyingUsername
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                        ),
+                      ),
+                    )
+                  : _usernameAvailable == true
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : _usernameAvailable == false
+                          ? const Icon(Icons.cancel, color: Colors.red)
+                          : null,
             ),
+            if (_usernameMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 12, top: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _usernameAvailable == true
+                              ? Icons.check_circle
+                              : Icons.cancel,
+                          size: 16,
+                          color: _usernameAvailable == true
+                              ? Colors.green
+                              : Colors.red,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _usernameMessage!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _usernameAvailable == true
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_usernameSuggestions.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Suggestions : ${_usernameSuggestions.join(", ")}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             const SizedBox(height: 20),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -885,7 +1120,69 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               hintText: 'Numéro d\'Identification National',
               validator: (value) => Validators.validateNIN(value),
               isRequired: true,
+              onChanged: (value) {
+                _ninDebounce?.cancel();
+                
+                if (value.isEmpty || value.length < 5) {
+                  setState(() {
+                    _ninAvailable = null;
+                    _ninMessage = null;
+                  });
+                  return;
+                }
+                
+                _ninDebounce = Timer(const Duration(milliseconds: 800), () {
+                  _verifyNin(value);
+                });
+              },
+              suffixIcon: _isVerifyingNin
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                        ),
+                      ),
+                    )
+                  : _ninAvailable == true
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : _ninAvailable == false
+                          ? const Icon(Icons.cancel, color: Colors.red)
+                          : null,
             ),
+            if (_ninMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 12, top: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      _ninAvailable == true
+                          ? Icons.check_circle
+                          : Icons.cancel,
+                      size: 16,
+                      color: _ninAvailable == true
+                          ? Colors.green
+                          : Colors.red,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _ninMessage!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _ninAvailable == true
+                              ? Colors.green
+                              : Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _nifController,
@@ -966,13 +1263,42 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                   horizontal: 16,
                   vertical: 16,
                 ),
+                suffixIcon: _isVerifyingPhone
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                          ),
+                        ),
+                      )
+                    : _phoneAvailable == true
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : _phoneAvailable == false
+                            ? const Icon(Icons.cancel, color: Colors.red)
+                            : null,
               ),
               initialCountryCode: 'HT', // Haïti par défaut
               dropdownIconPosition: IconPosition.trailing,
               dropdownTextStyle: const TextStyle(fontSize: 16),
               flagsButtonPadding: const EdgeInsets.only(left: 12),
               onChanged: (phone) {
-                // Le numéro complet est dans phone.completeNumber
+                _phoneDebounce?.cancel();
+                
+                if (phone.completeNumber.isEmpty || phone.number.length < 8) {
+                  setState(() {
+                    _phoneAvailable = null;
+                    _phoneMessage = null;
+                  });
+                  return;
+                }
+                
+                _phoneDebounce = Timer(const Duration(milliseconds: 800), () {
+                  _verifyPhone(phone.completeNumber);
+                });
               },
               validator: (phone) {
                 if (phone == null || phone.number.isEmpty) {
@@ -981,6 +1307,36 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 return null;
               },
             ),
+            if (_phoneMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 12, top: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      _phoneAvailable == true
+                          ? Icons.check_circle
+                          : Icons.cancel,
+                      size: 16,
+                      color: _phoneAvailable == true
+                          ? Colors.green
+                          : Colors.red,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _phoneMessage!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _phoneAvailable == true
+                              ? Colors.green
+                              : Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _telephoneEtrangerController,
@@ -995,7 +1351,69 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               keyboardType: TextInputType.emailAddress,
               validator: (value) => Validators.validateRequired(value, 'L\'email'),
               isRequired: true,
+              onChanged: (value) {
+                _emailDebounce?.cancel();
+                
+                if (value.isEmpty || !value.contains('@')) {
+                  setState(() {
+                    _emailAvailable = null;
+                    _emailMessage = null;
+                  });
+                  return;
+                }
+                
+                _emailDebounce = Timer(const Duration(milliseconds: 800), () {
+                  _verifyEmail(value);
+                });
+              },
+              suffixIcon: _isVerifyingEmail
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: Padding(
+                        padding: EdgeInsets.all(12.0),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                        ),
+                      ),
+                    )
+                  : _emailAvailable == true
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : _emailAvailable == false
+                          ? const Icon(Icons.cancel, color: Colors.red)
+                          : null,
             ),
+            if (_emailMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 12, top: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      _emailAvailable == true
+                          ? Icons.check_circle
+                          : Icons.cancel,
+                      size: 16,
+                      color: _emailAvailable == true
+                          ? Colors.green
+                          : Colors.red,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _emailMessage!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _emailAvailable == true
+                              ? Colors.green
+                              : Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _adresseCompleteController,

@@ -340,6 +340,123 @@ class ApiService {
     }
   }
 
+  /// Vérifier la disponibilité d'un nom d'utilisateur
+  Future<Map<String, dynamic>> checkUsernameAvailability(String username) async {
+    try {
+      final response = await _dio.get('/auth/check-username/$username');
+      
+      if (response.statusCode == 200) {
+        return {
+          'available': response.data['available'] ?? false,
+          'message': response.data['message'] ?? '',
+          'suggestions': response.data['suggestions'] ?? [],
+        };
+      } else {
+        return {
+          'available': false,
+          'message': 'Erreur lors de la vérification',
+        };
+      }
+    } on DioException catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    } catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    }
+  }
+
+  /// Vérifier la disponibilité d'un email
+  Future<Map<String, dynamic>> checkEmailAvailability(String email) async {
+    try {
+      final response = await _dio.get('/auth/check-email/$email');
+      
+      if (response.statusCode == 200) {
+        return {
+          'available': response.data['available'] ?? false,
+          'message': response.data['message'] ?? '',
+        };
+      } else {
+        return {
+          'available': false,
+          'message': 'Erreur lors de la vérification',
+        };
+      }
+    } on DioException catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    } catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    }
+  }
+
+  /// Vérifier la disponibilité d'un numéro de téléphone
+  Future<Map<String, dynamic>> checkPhoneAvailability(String phone) async {
+    try {
+      final response = await _dio.get('/auth/check-phone/$phone');
+      
+      if (response.statusCode == 200) {
+        return {
+          'available': response.data['available'] ?? false,
+          'message': response.data['message'] ?? '',
+        };
+      } else {
+        return {
+          'available': false,
+          'message': 'Erreur lors de la vérification',
+        };
+      }
+    } on DioException catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    } catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    }
+  }
+
+  /// Vérifier la disponibilité d'un NIN
+  Future<Map<String, dynamic>> checkNinAvailability(String nin) async {
+    try {
+      final response = await _dio.get('/auth/check-nin/$nin');
+      
+      if (response.statusCode == 200) {
+        return {
+          'available': response.data['available'] ?? false,
+          'message': response.data['message'] ?? '',
+        };
+      } else {
+        return {
+          'available': false,
+          'message': 'Erreur lors de la vérification',
+        };
+      }
+    } on DioException catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    } catch (e) {
+      return {
+        'available': false,
+        'message': 'Erreur lors de la vérification',
+      };
+    }
+  }
+
   /// Créer une cotisation avec upload de reçu
   Future<Map<String, dynamic>> createCotisation(CotisationRequest request) async {
     try {
