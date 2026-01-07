@@ -422,6 +422,63 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
         return;
       }
       
+      // ⚠️ NOUVELLE VÉRIFICATION : Code d'adhésion obligatoire
+      if (_codeAdhesionValid != true) {
+        // Si le code n'a jamais été vérifié, le vérifier maintenant
+        if (_codeAdhesionValid == null) {
+          _verifyCodeAdhesion();
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Vérification du code de référence en cours...',
+                      style: TextStyle(fontSize: 15),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
+        
+        // Si le code a été vérifié et est invalide
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.cancel, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _codeVerificationMessage ?? 'Code de référence invalide',
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Scanner QR',
+              textColor: Colors.white,
+              onPressed: _scanQRCode,
+            ),
+          ),
+        );
+        return;
+      }
+      
+      // Tout est valide, passer à l'étape 2
       setState(() {
         _currentStep = 1;
       });
@@ -800,6 +857,10 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                           if (value.contains(' ')) {
                             return 'Le code ne doit pas contenir d\'espaces';
                           }
+                          // ⚠️ NOUVELLE VALIDATION : Vérifier que le code est valide
+                          if (_codeAdhesionValid == false) {
+                            return 'Ce code de référence est invalide';
+                          }
                           return null;
                         },
                         onChanged: (value) {
@@ -808,6 +869,17 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                             setState(() {
                               _codeAdhesionValid = null;
                               _codeVerificationMessage = null;
+                            });
+                          }
+                          
+                          // ⚠️ VÉRIFICATION AUTOMATIQUE avec debouncing
+                          if (value.trim().isNotEmpty && value.length >= 3) {
+                            // Annuler le timer précédent
+                            _usernameDebounce?.cancel();
+                            
+                            // Créer un nouveau timer de 1 seconde
+                            _usernameDebounce = Timer(const Duration(milliseconds: 1000), () {
+                              _verifyCodeAdhesion();
                             });
                           }
                         },
