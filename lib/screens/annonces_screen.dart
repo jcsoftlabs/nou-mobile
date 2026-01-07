@@ -67,10 +67,9 @@ class _AnnoncesScreenState extends State<AnnoncesScreen> {
     return Scaffold(
       appBar: GradientAppBar(
         title: 'Annonces',
-        automaticallyImplyLeading: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: _isLoading

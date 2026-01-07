@@ -6,6 +6,7 @@ class CustomDropdown extends StatelessWidget {
   final List<String> items;
   final ValueChanged<String?> onChanged;
   final String? Function(String?)? validator;
+  final bool isRequired;
 
   const CustomDropdown({
     super.key,
@@ -14,6 +15,7 @@ class CustomDropdown extends StatelessWidget {
     required this.items,
     required this.onChanged,
     this.validator,
+    this.isRequired = false,
   });
 
   @override
@@ -36,6 +38,26 @@ class CustomDropdown extends StatelessWidget {
       onChanged: onChanged,
       validator: validator,
       decoration: InputDecoration(
+        label: isRequired
+            ? Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: hintText,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                overflow: TextOverflow.ellipsis,
+              )
+            : null,
         filled: true,
         fillColor: const Color(0xFFF5F5F5),
         border: OutlineInputBorder(

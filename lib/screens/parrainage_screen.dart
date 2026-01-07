@@ -31,6 +31,7 @@ class _ParrainageScreenState extends State<ParrainageScreen> {
 
   List<Referral> _filleuls = [];
   int _points = 0;
+  int _nombreFilleuls = 0; // Nombre depuis les statistiques du backend
   bool _isLoading = true;
 
   @override
@@ -42,7 +43,7 @@ class _ParrainageScreenState extends State<ParrainageScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
 
-    // Charger les filleuls
+    // Charger les filleuls et statistiques
     final filleulsResult = await _apiService.getReferrals(widget.membreId);
     // Charger les points
     final pointsResult = await _apiService.getPoints(widget.membreId);
@@ -50,7 +51,9 @@ class _ParrainageScreenState extends State<ParrainageScreen> {
     if (mounted) {
       setState(() {
         if (filleulsResult['success']) {
-          _filleuls = filleulsResult['data'];
+          _filleuls = filleulsResult['data']['filleuls'] ?? [];
+          // Utiliser le nombre depuis les statistiques du backend
+          _nombreFilleuls = filleulsResult['data']['statistiques']?['nombre_filleuls'] ?? _filleuls.length;
         }
         if (pointsResult['success']) {
           _points = pointsResult['data'];
@@ -149,10 +152,9 @@ class _ParrainageScreenState extends State<ParrainageScreen> {
     return Scaffold(
       appBar: GradientAppBar(
         title: 'Parrainage',
-        automaticallyImplyLeading: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: _isLoading
@@ -305,7 +307,7 @@ class _ParrainageScreenState extends State<ParrainageScreen> {
           children: [
             _buildStatItem(
               icon: Icons.people,
-              value: '${_filleuls.length}',
+              value: '$_nombreFilleuls',
               label: 'Filleuls',
             ),
             Container(

@@ -1,23 +1,27 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/api_service.dart';
+import '../../services/membre_cache_service.dart';
 import '../../models/membre.dart';
 import '../../models/register_request.dart';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final MembreCacheService _cacheService = MembreCacheService();
 
   Membre? _currentMembre;
   String? _token;
   String? _refreshToken;
   bool _isAuthenticated = false;
   bool _isLoading = true; // true au départ pour le chargement initial
+  bool _isOfflineMode = false; // Mode hors ligne
 
   Membre? get currentMembre => _currentMembre;
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get token => _token;
+  bool get isOfflineMode => _isOfflineMode;
 
   // Clés de stockage
   static const String _keyToken = 'access_token';
@@ -42,14 +46,34 @@ class AuthProvider with ChangeNotifier {
       if (_token != null && membreIdStr != null) {
         final membreId = int.tryParse(membreIdStr);
         if (membreId != null) {
-          // Charger les données du membre
-          final result = await _apiService.getMembreById(membreId);
-          if (result['success']) {
-            _currentMembre = result['data'];
-            _isAuthenticated = true;
-          } else {
-            // Token invalide, nettoyer
-            await _clearAuth();
+          try {
+            // Essayer de charger les données du membre depuis l'API
+            final result = await _apiService.getMembreById(membreId);
+            if (result['success']) {
+              _currentMembre = result['data'];
+              _isAuthenticated = true;
+              _isOfflineMode = false;
+              
+              // Sauvegarder dans le cache pour usage hors ligne
+              await _cacheService.saveMembre(_currentMembre!);
+            } else {
+              // Token invalide, nettoyer
+              await _clearAuth();
+            }
+          } catch (e) {
+            debugPrint('Impossible de charger depuis l\'API: $e');
+            
+            // Essayer de charger depuis le cache local
+            final cachedMembre = await _cacheService.getMembre();
+            if (cachedMembre != null) {
+              _currentMembre = cachedMembre;
+              _isAuthenticated = true;
+              _isOfflineMode = true;
+              debugPrint('Mode hors ligne activé - données chargées depuis le cache');
+            } else {
+              // Pas de cache disponible, nettoyer
+              await _clearAuth();
+            }
           }
         }
       }
@@ -78,18 +102,27 @@ class AuthProvider with ChangeNotifier {
         
         // Le backend renvoie { membre, token, refresh_token }
         if (data['membre'] != null) {
-          _currentMembre = Membre.fromJson(data['membre']);
-          _isAuthenticated = true;
-
-          // Sauvegarder dans SecureStorage
+          final membreId = data['membre']['id'];
+          
+          // Sauvegarder le token d'abord
           await _storage.write(key: _keyToken, value: _token);
           await _storage.write(key: _keyRefreshToken, value: _refreshToken);
-          await _storage.write(key: _keyMembreId, value: _currentMembre!.id.toString());
-          await _storage.write(key: _keyCodeAdhesion, value: _currentMembre!.codeAdhesion);
-
-          notifyListeners();
+          await _storage.write(key: _keyMembreId, value: membreId.toString());
           
-          return {'success': true, 'message': 'Connexion réussie'};
+          // Charger le membre complet avec tous ses champs
+          final membreResult = await _apiService.getMembreById(membreId);
+          if (membreResult['success']) {
+            _currentMembre = membreResult['data'];
+            _isAuthenticated = true;
+            _isOfflineMode = false;
+            await _storage.write(key: _keyCodeAdhesion, value: _currentMembre!.codeAdhesion);
+            
+            // Sauvegarder dans le cache pour usage hors ligne
+            await _cacheService.saveMembre(_currentMembre!);
+            
+            notifyListeners();
+            return {'success': true, 'message': 'Connexion réussie'};
+          }
         }
       }
 
@@ -143,6 +176,7 @@ class AuthProvider with ChangeNotifier {
         if (data['membre'] != null) {
           _currentMembre = Membre.fromJson(data['membre']);
           _isAuthenticated = true;
+          _isOfflineMode = false;
 
           // Sauvegarder dans SecureStorage
           await _storage.write(key: _keyToken, value: _token);
@@ -151,6 +185,9 @@ class AuthProvider with ChangeNotifier {
               key: _keyMembreId, value: _currentMembre!.id.toString());
           await _storage.write(
               key: _keyCodeAdhesion, value: _currentMembre!.codeAdhesion);
+
+          // Sauvegarder dans le cache pour usage hors ligne
+          await _cacheService.saveMembre(_currentMembre!);
 
           _isLoading = false;
           notifyListeners();
@@ -175,6 +212,7 @@ class AuthProvider with ChangeNotifier {
   /// Déconnexion
   Future<void> logout() async {
     await _clearAuth();
+    await _cacheService.clearMembre();
     notifyListeners();
   }
 
@@ -198,6 +236,7 @@ class AuthProvider with ChangeNotifier {
     _refreshToken = null;
     _currentMembre = null;
     _isAuthenticated = false;
+    _isOfflineMode = false;
 
     await _storage.deleteAll();
   }
@@ -210,10 +249,18 @@ class AuthProvider with ChangeNotifier {
       final result = await _apiService.getMembreById(_currentMembre!.id);
       if (result['success']) {
         _currentMembre = result['data'];
+        _isOfflineMode = false;
+        
+        // Mettre à jour le cache
+        await _cacheService.saveMembre(_currentMembre!);
+        
         notifyListeners();
       }
     } catch (e) {
       debugPrint('Erreur mise à jour membre: $e');
+      // En cas d'erreur, on reste en mode hors ligne
+      _isOfflineMode = true;
+      notifyListeners();
     }
   }
 }

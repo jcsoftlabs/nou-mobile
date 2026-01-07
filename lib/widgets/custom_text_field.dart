@@ -13,6 +13,8 @@ class CustomTextField extends StatelessWidget {
   final int? maxLines;
   final ValueChanged<String>? onChanged;
   final List<TextInputFormatter>? inputFormatters;
+  final bool readOnly;
+  final bool isRequired;
 
   const CustomTextField({
     super.key,
@@ -27,6 +29,8 @@ class CustomTextField extends StatelessWidget {
     this.maxLines = 1,
     this.onChanged,
     this.inputFormatters,
+    this.readOnly = false,
+    this.isRequired = false,
   });
 
   @override
@@ -42,8 +46,29 @@ class CustomTextField extends StatelessWidget {
           maxLines: maxLines,
           onChanged: onChanged,
           inputFormatters: inputFormatters,
+          readOnly: readOnly,
           decoration: InputDecoration(
             hintText: hintText,
+            label: isRequired
+                ? Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: hintText,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const TextSpan(
+                          text: ' *',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : null,
             hintStyle: const TextStyle(
               color: Colors.grey,
               fontSize: 16,

@@ -13,11 +13,11 @@ class RegisterRequest {
   final String dateDeNaissance;
   final String? nomPere;
   final String? nomMere;
-  final String? nin;
+  final String nin;
   final String? nif;
   final String? situationMatrimoniale;
-  final int? nbEnfants;
-  final int? nbPersonnesACharge;
+  final int nbEnfants;
+  final int nbPersonnesACharge;
   final String telephonePrincipal;
   final String? telephoneEtranger;
   final String email;
@@ -56,11 +56,11 @@ class RegisterRequest {
     required this.dateDeNaissance,
     this.nomPere,
     this.nomMere,
-    this.nin,
+    required this.nin,
     this.nif,
     this.situationMatrimoniale,
-    this.nbEnfants,
-    this.nbPersonnesACharge,
+    required this.nbEnfants,
+    required this.nbPersonnesACharge,
     required this.telephonePrincipal,
     this.telephoneEtranger,
     required this.email,

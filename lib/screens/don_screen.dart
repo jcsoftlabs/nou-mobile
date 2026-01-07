@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../services/api_service.dart';
 import '../models/don.dart';
 import '../widgets/custom_text_field.dart';
+import 'payment_screen.dart';
 
 class DonScreen extends StatefulWidget {
   const DonScreen({super.key});
@@ -16,89 +15,14 @@ class DonScreen extends StatefulWidget {
 class _DonScreenState extends State<DonScreen> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = ApiService();
-  final _imagePicker = ImagePicker();
   final _montantController = TextEditingController();
   final _descriptionController = TextEditingController();
-
-  bool _isLoading = false;
-  String? _recuPath;
 
   @override
   void dispose() {
     _montantController.dispose();
     _descriptionController.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickRecuImage() async {
-    final XFile? image = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      maxHeight: 1200,
-    );
-    if (image != null) {
-      setState(() {
-        _recuPath = image.path;
-      });
-    }
-  }
-
-  Future<void> _submitDon() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    final donRequest = DonRequest(
-      montant: double.parse(_montantController.text),
-      description: _descriptionController.text.isEmpty
-          ? null
-          : _descriptionController.text,
-    );
-
-    try {
-      final result = await _apiService.createDon(
-        donRequest,
-        recuPath: _recuPath,
-      );
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      if (result['success'] == true) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Don enregistré avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(context, true); // Retourner true pour indiquer succès
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Erreur lors de l\'enregistrement'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   @override
@@ -151,7 +75,7 @@ class _DonScreenState extends State<DonScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Votre don sera vérifié par un administrateur avant d\'être validé.',
+                        'Votre don sera traité de manière sécurisée via PlopPlop.',
                         style: TextStyle(
                           color: Colors.red.shade700,
                           fontSize: 14,
@@ -178,8 +102,8 @@ class _DonScreenState extends State<DonScreen> {
                     return 'Veuillez entrer un montant';
                   }
                   final montant = double.tryParse(value);
-                  if (montant == null || montant <= 0) {
-                    return 'Veuillez entrer un montant valide';
+                  if (montant == null || montant < 20) {
+                    return 'Le montant minimum est de 20 HTG';
                   }
                   return null;
                 },
@@ -195,106 +119,47 @@ class _DonScreenState extends State<DonScreen> {
                 prefixIcon: Icons.message_outlined,
               ),
 
-              const SizedBox(height: 24),
-
-              // Section reçu
-              const Text(
-                'Reçu de paiement (optionnel)',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Bouton pour sélectionner le reçu
-              InkWell(
-                onTap: _pickRecuImage,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.grey.shade300,
-                      width: 2,
-                      style: BorderStyle.solid,
-                    ),
-                  ),
-                  child: _recuPath != null
-                      ? Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                File(_recuPath!),
-                                width: double.infinity,
-                                height: double.infinity,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _recuPath = null;
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.close,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.cloud_upload_outlined,
-                              size: 48,
-                              color: Colors.grey.shade400,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Ajouter une photo du reçu',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'JPG, PNG (Max 5MB)',
-                              style: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-
               const SizedBox(height: 40),
 
-              // Bouton soumettre
-              ElevatedButton(
-                onPressed: _isLoading ? null : _submitDon,
+              // Bouton Payer en ligne
+              ElevatedButton.icon(
+                onPressed: () async {
+                  // Valider le formulaire
+                  if (!_formKey.currentState!.validate()) {
+                    return;
+                  }
+
+                  final montant = double.parse(_montantController.text);
+                  
+                  // Naviguer vers l'écran de paiement
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PaymentScreen(
+                        type: 'don',
+                        montant: montant,
+                        metadata: {
+                          'description': _descriptionController.text.isEmpty 
+                              ? null 
+                              : _descriptionController.text,
+                        },
+                      ),
+                    ),
+                  );
+
+                  // Si le paiement est réussi, retourner
+                  if (result == true) {
+                    if (!mounted) return;
+                    Navigator.pop(context, true);
+                  }
+                },
+                icon: const Icon(Icons.payment, size: 24),
+                label: const Text(
+                  'Payer en ligne',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF0000),
+                  backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -302,22 +167,36 @@ class _DonScreenState extends State<DonScreen> {
                   ),
                   elevation: 2,
                 ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Text(
-                        'Soumettre le don',
+              ),
+
+              const SizedBox(height: 20),
+
+              // Information
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: Colors.grey.shade600,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Les paiements sont traités de manière sécurisée via PlopPlop (MonCash, Kashpaw, NatCash).',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
                         ),
                       ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

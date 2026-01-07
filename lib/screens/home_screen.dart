@@ -29,13 +29,45 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoadingAnnonces = true;
   bool _isAnnonceDismissed = false;
   bool _hasUnreadAnnonces = false;
+  int _currentPhotoIndex = 0;
+  late PageController _pageController;
+
+  // Images temporaires depuis internet (en attendant la médiathèque)
+  final List<String> _tempPhotos = [
+    'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800',
+    'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=800',
+    'https://images.unsplash.com/photo-1505765050516-f72dcac9c60e?w=800',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
     _loadCotisationInfo();
     _loadParrainInfo();
     _loadTopAnnonce();
+    _startAutoScroll();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _startAutoScroll() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      if (_pageController.hasClients) {
+        final nextPage = (_currentPhotoIndex + 1) % _tempPhotos.length;
+        _pageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+      _startAutoScroll();
+    });
   }
 
   Future<void> _loadCotisationInfo() async {
@@ -128,6 +160,42 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
+          // Badge Mode hors ligne
+          if (authProvider.isOfflineMode)
+            Container(
+              margin: const EdgeInsets.only(right: 8, top: 12, bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.cloud_off,
+                    size: 16,
+                    color: Colors.orange.shade800,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Hors ligne',
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Badge Statut membre
           if (membre != null)
             Container(
@@ -242,6 +310,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: _buildQuickAccessGrid(context),
+                  ),
+
+                  const SizedBox(height: 24),
+                  // Carousel de photos
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _buildPhotoCarousel(context),
                   ),
 
                   const SizedBox(height: 32),
@@ -460,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => context.go('/annonces'),
+        onTap: () => context.push('/annonces'),
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -588,99 +663,67 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildQuickAccessGrid(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickAccessCard(
-                context,
-                'Podcasts',
-                Icons.podcasts,
-                () => context.go('/podcasts'),
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Expanded(
+            child: _buildQuickAccessCard(
+              context,
+              'Parrainage',
+              Icons.people,
+              () => context.push('/parrainage'),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildQuickAccessCard(
-                context,
-                'Formations',
-                Icons.school,
-                () => context.go('/formations'),
-              ),
+          ),
+          Expanded(
+            child: _buildQuickAccessCard(
+              context,
+              'Actualités',
+              Icons.article,
+              () => context.push('/news'),
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickAccessCard(
-                context,
-                'Cotisation',
-                Icons.payment,
-                () => context.go('/cotisation'),
-              ),
+          ),
+          Expanded(
+            child: _buildQuickAccessCard(
+              context,
+              'Annonces',
+              Icons.campaign,
+              () => context.push('/annonces'),
+              showBadge: _hasUnreadAnnonces,
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildQuickAccessCard(
-                context,
-                'Parrainage',
-                Icons.people,
-                () => context.go('/parrainage'),
-              ),
+          ),
+          Expanded(
+            child: _buildQuickAccessCard(
+              context,
+              'Faire un don',
+              Icons.volunteer_activism,
+              () async {
+                final result = await context.push('/don');
+                if (result == true && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Merci pour votre générosité !'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
             ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickAccessCard(
-                context,
-                'Actualités',
-                Icons.article,
-                () => context.go('/news'),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildQuickAccessCard(
-                context,
-'Annonces',
-                Icons.campaign,
-                () => context.go('/annonces'),
-                showBadge: _hasUnreadAnnonces,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _buildQuickAccessCard(
-                context,
-                'Faire un don',
-                Icons.volunteer_activism,
-                () async {
-                  final result = await context.push('/don');
-                  if (result == true && mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Merci pour votre générosité !'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-              ),
-            ),
-            const Expanded(child: SizedBox()),
-          ],
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -691,46 +734,55 @@ class _HomeScreenState extends State<HomeScreen> {
     VoidCallback onTap, {
     bool showBadge = false,
   }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon, size: 48, color: const Color(0xFFFF0000)),
-                if (showBadge)
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 32,
+                  color: const Color(0xFFFF0000),
+                ),
+              ),
+              if (showBadge)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
                     ),
                   ),
-              ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              height: 1.2,
             ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1057,6 +1109,91 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoCarousel(BuildContext context) {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentPhotoIndex = index;
+                });
+              },
+              itemCount: _tempPhotos.length,
+              itemBuilder: (context, index) {
+                return Image.network(
+                  _tempPhotos[index],
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.shade200,
+                      child: const Center(
+                        child: Icon(
+                          Icons.image_not_supported,
+                          size: 50,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            // Indicateurs de page
+            Positioned(
+              bottom: 12,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  _tempPhotos.length,
+                  (index) => Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _currentPhotoIndex == index
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

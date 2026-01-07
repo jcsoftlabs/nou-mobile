@@ -92,10 +92,9 @@ class _NewsListScreenState extends State<NewsListScreen> {
     return Scaffold(
       appBar: GradientAppBar(
         title: 'Actualités',
-        automaticallyImplyLeading: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: _isLoading

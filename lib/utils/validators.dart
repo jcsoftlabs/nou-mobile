@@ -42,18 +42,35 @@ class Validators {
     return null;
   }
 
-  /// Valide une date au format YYYY-MM-DD
+  /// Valide une date au format DD/MM/YYYY ou YYYY-MM-DD
   static String? validateDate(String? value, {bool required = true}) {
     if (value == null || value.isEmpty) {
       return required ? 'La date est obligatoire' : null;
     }
     try {
-      final date = DateTime.parse(value);
+      DateTime date;
+      
+      // Vérifier si c'est le format DD/MM/YYYY
+      if (value.contains('/')) {
+        final parts = value.split('/');
+        if (parts.length == 3) {
+          final day = int.parse(parts[0]);
+          final month = int.parse(parts[1]);
+          final year = int.parse(parts[2]);
+          date = DateTime(year, month, day);
+        } else {
+          return 'Format de date invalide (JJ/MM/AAAA)';
+        }
+      } else {
+        // Format YYYY-MM-DD
+        date = DateTime.parse(value);
+      }
+      
       if (date.isAfter(DateTime.now())) {
-        return 'Date invalide';
+        return 'La date ne peut pas être dans le futur';
       }
     } catch (e) {
-      return 'Format de date invalide (AAAA-MM-JJ)';
+      return 'Format de date invalide (JJ/MM/AAAA)';
     }
     return null;
   }

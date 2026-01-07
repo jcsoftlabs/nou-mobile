@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:provider/provider.dart';
 import '../data/providers/auth_provider.dart';
 import '../models/register_request.dart';
+import '../services/api_service.dart';
 import '../utils/validators.dart';
+import '../utils/nif_formatter.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_dropdown.dart';
 import '../constants/haiti_locations.dart';
@@ -26,6 +31,11 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  
+  // État de validation du code d'adhésion
+  bool? _codeAdhesionValid;
+  bool _isVerifyingCode = false;
+  String? _codeVerificationMessage;
 
   // Contrôleurs Étape 1
   final _usernameController = TextEditingController();
@@ -170,28 +180,98 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
     );
     if (picked != null) {
       setState(() {
+        // Afficher au format JJ/MM/AAAA (plus intuitif)
         _dateNaissanceController.text =
-            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      });
+    }
+  }
+
+  Future<void> _verifyCodeAdhesion() async {
+    final code = _codeAdhesionController.text.trim();
+    if (code.isEmpty) {
+      setState(() {
+        _codeAdhesionValid = false;
+        _codeVerificationMessage = 'Veuillez entrer un code';
+      });
+      return;
+    }
+
+    setState(() {
+      _isVerifyingCode = true;
+      _codeVerificationMessage = null;
+    });
+
+    try {
+      final apiService = ApiService();
+      final result = await apiService.verifyCodeAdhesion(code);
+      
+      setState(() {
+        _codeAdhesionValid = result['exists'] == true;
+        _codeVerificationMessage = result['message'];
+        _isVerifyingCode = false;
+      });
+    } catch (e) {
+      setState(() {
+        _codeAdhesionValid = false;
+        _codeVerificationMessage = 'Erreur lors de la vérification';
+        _isVerifyingCode = false;
       });
     }
   }
 
   void _nextStep() {
     if (_currentStep == 0) {
-      if (_formKey1.currentState!.validate()) {
-        if (_passwordController.text != _confirmPasswordController.text) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Les mots de passe ne correspondent pas'),
-              backgroundColor: Colors.red,
+      // Valider le formulaire de l'étape 1
+      if (!_formKey1.currentState!.validate()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Veuillez remplir tous les champs obligatoires',
+                    style: TextStyle(fontSize: 15),
+                  ),
+                ),
+              ],
             ),
-          );
-          return;
-        }
-        setState(() {
-          _currentStep = 1;
-        });
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
       }
+      
+      if (_passwordController.text != _confirmPasswordController.text) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.lock_outline, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Les mots de passe ne correspondent pas',
+                    style: TextStyle(fontSize: 15),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      
+      setState(() {
+        _currentStep = 1;
+      });
     } else {
       _submitForm();
     }
@@ -206,15 +286,49 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
   }
 
   Future<void> _submitForm() async {
+    // Valider le formulaire de l'étape 2
     if (!_formKey2.currentState!.validate()) {
+      // Afficher un message clair à l'utilisateur
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Veuillez remplir tous les champs obligatoires marqués en rouge',
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
     if (!_accepteConditions) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vous devez accepter les conditions d\'utilisation pour continuer'),
-          backgroundColor: Colors.red,
+          content: Row(
+            children: [
+              Icon(Icons.warning_amber, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Vous devez accepter les conditions d\'utilisation pour continuer',
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -224,6 +338,23 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
       _isLoading = true;
     });
 
+    // Convertir la date de JJ/MM/AAAA à AAAA-MM-JJ pour le backend
+    String? dateNaissanceISO;
+    if (_dateNaissanceController.text.isNotEmpty) {
+      try {
+        final parts = _dateNaissanceController.text.split('/');
+        if (parts.length == 3) {
+          final day = parts[0];
+          final month = parts[1];
+          final year = parts[2];
+          dateNaissanceISO = '$year-$month-$day';
+        }
+      } catch (e) {
+        // Si la conversion échoue, utiliser la valeur telle quelle
+        dateNaissanceISO = _dateNaissanceController.text;
+      }
+    }
+
     final registerRequest = RegisterRequest(
       username: _usernameController.text,
       codeAdhesion: _codeAdhesionController.text,
@@ -231,20 +362,24 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
       nom: _nomController.text,
       prenom: _prenomController.text,
       surnom: _surnomController.text.isEmpty ? null : _surnomController.text,
-      sexe: _sexe!,
-      lieuDeNaissance: _lieuNaissanceController.text,
-      dateDeNaissance: _dateNaissanceController.text,
+      sexe: _sexe ?? '',
+      lieuDeNaissance: _lieuNaissanceController.text.isEmpty
+          ? ''
+          : _lieuNaissanceController.text,
+      dateDeNaissance: dateNaissanceISO ?? '', // Utiliser la date convertie
       nomPere: _nomPereController.text.isEmpty ? null : _nomPereController.text,
       nomMere: _nomMereController.text.isEmpty ? null : _nomMereController.text,
-      nin: _ninController.text.isEmpty ? null : _ninController.text,
-      nif: _nifController.text.isEmpty ? null : _nifController.text,
+      nin: _ninController.text,
+      nif: _nifController.text.isEmpty 
+          ? null 
+          : nifToBackendFormat(_nifController.text), // Convertir XXX-XXX-XXX-X en XXXXXXXXXX
       situationMatrimoniale: _situationMatrimoniale,
       nbEnfants: _nbEnfantsController.text.isEmpty
-          ? null
-          : int.tryParse(_nbEnfantsController.text),
+          ? 0
+          : int.tryParse(_nbEnfantsController.text) ?? 0,
       nbPersonnesACharge: _nbPersonnesChargeController.text.isEmpty
-          ? null
-          : int.tryParse(_nbPersonnesChargeController.text),
+          ? 0
+          : int.tryParse(_nbPersonnesChargeController.text) ?? 0,
       telephonePrincipal: _telephonePrincipalController.text,
       telephoneEtranger: _telephoneEtrangerController.text.isEmpty
           ? null
@@ -312,23 +447,21 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
         // L'utilisateur est maintenant authentifié : on l'envoie directement sur le Home.
         context.go('/home');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'Erreur lors de l\'inscription'),
-            backgroundColor: Colors.red,
-          ),
+        // Afficher un dialogue d'erreur détaillé
+        _showErrorDialog(
+          result['message'] ?? 'Erreur lors de l\'inscription',
+          errorType: result['errorType'],
+          fieldErrors: result['fieldErrors'],
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: Colors.red,
-        ),
+      _showErrorDialog(
+        'Une erreur inattendue est survenue',
+        errorType: 'unknown',
       );
     }
   }
@@ -407,34 +540,113 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               prefixIcon: Icons.person_outline,
               helperText: 'Lettres, chiffres et _ uniquement',
               validator: Validators.validateUsername,
+              isRequired: true,
             ),
             const SizedBox(height: 20),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: CustomTextField(
-                    controller: _codeAdhesionController,
-                    hintText: 'Code de référence',
-                    prefixIcon: Icons.qr_code,
-                    helperText: 'Obligatoire pour l\'inscription',
-                    validator: (value) =>
-                        Validators.validateRequired(value, 'Le code de référence'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  margin: const EdgeInsets.only(bottom: 24),
-                  child: IconButton(
-                    onPressed: _scanQRCode,
-                    icon: const Icon(Icons.qr_code_scanner, size: 32),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.all(12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextField(
+                        controller: _codeAdhesionController,
+                        hintText: 'Code de référence',
+                        prefixIcon: Icons.qr_code,
+                        helperText: 'Obligatoire pour l\'inscription (sans espaces)',
+                        isRequired: true,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Le code de référence est requis';
+                          }
+                          if (value.contains(' ')) {
+                            return 'Le code ne doit pas contenir d\'espaces';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          // Réinitialiser l'état de validation quand l'utilisateur modifie le code
+                          if (_codeAdhesionValid != null) {
+                            setState(() {
+                              _codeAdhesionValid = null;
+                              _codeVerificationMessage = null;
+                            });
+                          }
+                        },
+                      ),
                     ),
-                    tooltip: 'Scanner QR Code',
-                  ),
+                    const SizedBox(width: 8),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      child: IconButton(
+                        onPressed: _isVerifyingCode ? null : _verifyCodeAdhesion,
+                        icon: _isVerifyingCode
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Icon(Icons.check_circle_outline, size: 28),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        tooltip: 'Vérifier le code',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      child: IconButton(
+                        onPressed: _scanQRCode,
+                        icon: const Icon(Icons.qr_code_scanner, size: 28),
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        tooltip: 'Scanner QR Code',
+                      ),
+                    ),
+                  ],
                 ),
+                if (_codeVerificationMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, top: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _codeAdhesionValid == true
+                              ? Icons.check_circle
+                              : Icons.cancel,
+                          size: 16,
+                          color: _codeAdhesionValid == true
+                              ? Colors.green
+                              : Colors.red,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _codeVerificationMessage!,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _codeAdhesionValid == true
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 20),
@@ -456,6 +668,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 },
               ),
               validator: Validators.validatePassword,
+              isRequired: true,
             ),
             const SizedBox(height: 20),
             CustomTextField(
@@ -482,6 +695,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 }
                 return null;
               },
+              isRequired: true,
             ),
             const SizedBox(height: 30),
             // Note d'information
@@ -604,6 +818,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               controller: _nomController,
               hintText: 'Nom',
               validator: (value) => Validators.validateRequired(value, 'Le nom'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -611,6 +826,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               hintText: 'Prénom',
               validator: (value) =>
                   Validators.validateRequired(value, 'Le prénom'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -624,6 +840,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               items: const ['Masculin', 'Féminin', 'Autre'],
               onChanged: (value) => setState(() => _sexe = value),
               validator: (value) => Validators.validateRequired(value, 'Le sexe'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -631,16 +848,26 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               hintText: 'Lieu de naissance',
               validator: (value) =>
                   Validators.validateRequired(value, 'Le lieu de naissance'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
-            CustomTextField(
-              controller: _dateNaissanceController,
-              hintText: 'Date de naissance (AAAA-MM-JJ)',
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.calendar_today, color: Colors.red),
-                onPressed: () => _selectDate(context),
-              ),
-              validator: Validators.validateDate,
+            Row(
+              children: [
+                Expanded(
+                  child: CustomTextField(
+                    controller: _dateNaissanceController,
+                    hintText: 'Date de naissance (JJ/MM/AAAA)',
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [DateInputFormatter()],
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.calendar_today, color: Colors.red),
+                      onPressed: () => _selectDate(context),
+                    ),
+                    validator: Validators.validateDate,
+                    isRequired: true,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -657,11 +884,14 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               controller: _ninController,
               hintText: 'Numéro d\'Identification National',
               validator: (value) => Validators.validateNIN(value),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _nifController,
-              hintText: 'NIF',
+              hintText: 'NIF (ex: 002-882-508-1)',
+              keyboardType: TextInputType.number,
+              inputFormatters: [NifInputFormatter()],
               validator: (value) => Validators.validateNIF(value),
             ),
             const SizedBox(height: 16),
@@ -676,6 +906,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
                 'Union libre'
               ],
               onChanged: (value) => setState(() => _situationMatrimoniale = value),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -701,11 +932,54 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            CustomTextField(
+            IntlPhoneField(
               controller: _telephonePrincipalController,
-              hintText: 'Téléphone principal',
-              keyboardType: TextInputType.phone,
-              validator: (value) => Validators.validatePhone(value),
+              decoration: InputDecoration(
+                hintText: 'Téléphone principal',
+                hintStyle: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 16,
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF5F5F5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red, width: 2),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red, width: 1),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.red, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+              ),
+              initialCountryCode: 'HT', // Haïti par défaut
+              dropdownIconPosition: IconPosition.trailing,
+              dropdownTextStyle: const TextStyle(fontSize: 16),
+              flagsButtonPadding: const EdgeInsets.only(left: 12),
+              onChanged: (phone) {
+                // Le numéro complet est dans phone.completeNumber
+              },
+              validator: (phone) {
+                if (phone == null || phone.number.isEmpty) {
+                  return 'Le téléphone principal est requis';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -719,15 +993,16 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               controller: _emailController,
               hintText: 'Email',
               keyboardType: TextInputType.emailAddress,
-              validator: Validators.validateEmail,
+              validator: (value) => Validators.validateRequired(value, 'L\'email'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _adresseCompleteController,
               hintText: 'Adresse complète',
-              maxLines: 2,
-              validator: (value) =>
-                  Validators.validateRequired(value, 'L\'adresse'),
+              maxLines: 3,
+              validator: (value) => Validators.validateRequired(value, 'L\'adresse complète'),
+              isRequired: true,
             ),
             const SizedBox(height: 30),
             const Text(
@@ -867,6 +1142,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               hintText: 'Nom',
               validator: (value) =>
                   Validators.validateRequired(value, 'Le nom du référent'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -874,6 +1150,7 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               hintText: 'Prénom',
               validator: (value) =>
                   Validators.validateRequired(value, 'Le prénom du référent'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
@@ -882,20 +1159,23 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
               maxLines: 2,
               validator: (value) =>
                   Validators.validateRequired(value, 'L\'adresse du référent'),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _referentTelephoneController,
-              hintText: 'Téléphone',
+              hintText: 'Téléphone (ex: +509 3712 3456)',
               keyboardType: TextInputType.phone,
               validator: (value) => Validators.validatePhone(value),
+              isRequired: true,
             ),
             const SizedBox(height: 16),
             CustomTextField(
               controller: _relationReferentController,
-              hintText: 'Relation avec la personne',
+              hintText: 'Relation avec le référent',
               validator: (value) =>
-                  Validators.validateRequired(value, 'La relation'),
+                  Validators.validateRequired(value, 'La relation avec le référent'),
+              isRequired: true,
             ),
             const SizedBox(height: 30),
             const Text(
@@ -1036,5 +1316,134 @@ class _InscriptionScreenState extends State<InscriptionScreen> {
         ],
       ),
     );
+  }
+
+  void _showErrorDialog(
+    String message, {
+    String? errorType,
+    Map<String, dynamic>? fieldErrors,
+  }) {
+    // Déterminer le titre et l'icône selon le type d'erreur
+    String title = 'Erreur d\'inscription';
+    IconData icon = Icons.error_outline;
+    Color iconColor = Colors.red;
+
+    if (errorType == 'network') {
+      title = 'Problème de connexion';
+      icon = Icons.wifi_off;
+    } else if (errorType == 'validation') {
+      title = 'Données invalides';
+      icon = Icons.warning_amber_outlined;
+      iconColor = Colors.orange;
+    } else if (errorType == 'conflict') {
+      title = 'Informations déjà utilisées';
+      icon = Icons.person_off_outlined;
+    } else if (errorType == 'not_found') {
+      title = 'Code invalide';
+      icon = Icons.qr_code_scanner_outlined;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: const TextStyle(fontSize: 16),
+            ),
+            if (fieldErrors != null && fieldErrors.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              const Text(
+                'Détails des erreurs :',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...fieldErrors.entries.map((entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.arrow_right,
+                          size: 20,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            '${_getFieldLabel(entry.key)} : ${entry.value}',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+            ],
+          ],
+        ),
+        actions: [
+          if (errorType == 'network')
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _submitForm(); // Réessayer
+              },
+              child: const Text(
+                'Réessayer',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              errorType == 'network' ? 'Annuler' : 'OK',
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getFieldLabel(String fieldKey) {
+    const fieldLabels = {
+      'username': 'Nom d\'utilisateur',
+      'code_adhesion': 'Code d\'adhésion',
+      'password': 'Mot de passe',
+      'email': 'Email',
+      'telephone_principal': 'Téléphone principal',
+      'nom': 'Nom',
+      'prenom': 'Prénom',
+      'date_de_naissance': 'Date de naissance',
+      'departement': 'Département',
+      'commune': 'Commune',
+    };
+    return fieldLabels[fieldKey] ?? fieldKey;
   }
 }

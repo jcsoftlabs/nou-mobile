@@ -228,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _identifierController,
                   keyboardType: TextInputType.text,
                   decoration: InputDecoration(
-                    hintText: 'Email, Username ou Téléphone',
+                    hintText: 'Email, Username, Téléphone ou NIN',
                     prefixIcon: const Icon(Icons.person_outline, color: Colors.red),
                     filled: true,
                     fillColor: const Color(0xFFF5F5F5),

@@ -5,6 +5,7 @@ import '../models/cotisation.dart';
 import '../models/cotisation_status.dart';
 import '../services/api_service.dart';
 import '../widgets/gradient_app_bar.dart';
+import 'payment_screen.dart';
 
 class CotisationScreen extends StatefulWidget {
   final int membreId;
@@ -581,49 +582,48 @@ class _CotisationScreenState extends State<CotisationScreen> {
 
             const SizedBox(height: 32),
 
-            // Bouton MonCash
+            // Bouton Payer en ligne (PlopPlop)
             ElevatedButton.icon(
-              onPressed: _payWithMonCash,
-              icon: const Icon(Icons.account_balance_wallet, size: 28),
+              onPressed: () async {
+                // Valider le montant
+                final error = _validateMontant();
+                if (error != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(error), backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+
+                // Naviguer vers l'écran de paiement
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PaymentScreen(
+                      type: 'cotisation',
+                      montant: _montantSaisi!,
+                      metadata: {
+                        'annee': _cotisationStatus?.annee,
+                        'membre_id': widget.membreId,
+                      },
+                    ),
+                  ),
+                );
+
+                // Si le paiement est réussi, recharger les données
+                if (result == true) {
+                  _montantController.clear();
+                  _montantSaisi = null;
+                  _loadCotisationStatus();
+                }
+              },
+              icon: const Icon(Icons.payment, size: 28),
               label: const Text(
-                'Payer avec MonCash',
+                'Payer en ligne',
                 style: TextStyle(fontSize: 18),
               ),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Séparateur
-            const Row(
-              children: [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('OU', style: TextStyle(color: Colors.grey)),
-                ),
-                Expanded(child: Divider()),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // Bouton upload reçu
-            OutlinedButton.icon(
-              onPressed: _uploadReceipt,
-              icon: const Icon(Icons.upload_file, size: 28),
-              label: const Text(
-                'Uploader un reçu',
-                style: TextStyle(fontSize: 18),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red, width: 2),
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -646,7 +646,7 @@ class _CotisationScreenState extends State<CotisationScreen> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Les reçus uploadés seront validés par un administrateur.',
+                      'Les paiements sont traités de manière sécurisée via PlopPlop.',
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                   ),

@@ -230,33 +230,113 @@ class ApiService {
       }
     } on DioException catch (e) {
       if (e.response != null) {
-        // Erreur avec réponse du serveur
+        final statusCode = e.response?.statusCode;
+        final responseData = e.response?.data;
+        
+        // Extraire le message d'erreur principal
+        String message = responseData?['message'] ?? 'Erreur de connexion au serveur';
+        
+        // Extraire les erreurs de champs spécifiques si disponibles
+        Map<String, dynamic>? fieldErrors;
+        if (responseData != null && responseData['errors'] != null) {
+          fieldErrors = Map<String, dynamic>.from(responseData['errors']);
+        }
+        
+        // Différencier les types d'erreur selon le code HTTP
+        String errorType = 'server';
+        if (statusCode == 400) {
+          errorType = 'validation';
+          // Erreur de validation des données
+          if (message == 'Erreur de connexion au serveur') {
+            message = 'Les données fournies sont invalides';
+          }
+        } else if (statusCode == 409) {
+          errorType = 'conflict';
+          // Conflit (username ou email déjà pris)
+          if (message == 'Erreur de connexion au serveur') {
+            message = 'Ces informations sont déjà utilisées';
+          }
+        } else if (statusCode == 404) {
+          errorType = 'not_found';
+          // Code d'adhésion non trouvé
+          if (message == 'Erreur de connexion au serveur') {
+            message = 'Code d\'adhésion invalide';
+          }
+        } else if (statusCode != null && statusCode >= 500) {
+          errorType = 'server';
+          if (message == 'Erreur de connexion au serveur') {
+            message = 'Erreur du serveur. Veuillez réessayer plus tard.';
+          }
+        }
+        
         return {
           'success': false,
-          'message': e.response?.data['message'] ?? 'Erreur de connexion au serveur',
+          'message': message,
+          'errorType': errorType,
+          'statusCode': statusCode,
+          'fieldErrors': fieldErrors,
         };
       } else {
-        // Erreur de connexion
+        // Erreur de connexion (timeout, pas de réseau, etc.)
+        String message = 'Impossible de se connecter au serveur. Vérifiez votre connexion.';
+        
+        if (e.type == DioExceptionType.connectionTimeout || 
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout) {
+          message = 'La connexion a expiré. Vérifiez votre connexion internet et réessayez.';
+        }
+        
         return {
           'success': false,
-          'message': 'Impossible de se connecter au serveur. Vérifiez votre connexion.',
+          'message': message,
+          'errorType': 'network',
         };
       }
     } catch (e) {
       return {
         'success': false,
         'message': 'Une erreur inattendue est survenue: $e',
+        'errorType': 'unknown',
       };
     }
   }
 
   /// Vérifier si un code d'adhésion existe
-  Future<bool> verifyCodeAdhesion(String code) async {
+  Future<Map<String, dynamic>> verifyCodeAdhesion(String code) async {
     try {
       final response = await _dio.get('/auth/verify-code/$code');
-      return response.statusCode == 200 && response.data['exists'] == true;
+      
+      if (response.statusCode == 200) {
+        final exists = response.data['exists'] == true;
+        return {
+          'exists': exists,
+          'message': exists 
+              ? 'Code d\'adhésion valide' 
+              : 'Code d\'adhésion invalide',
+          'data': response.data['data'],
+        };
+      } else {
+        return {
+          'exists': false,
+          'message': 'Impossible de vérifier le code',
+        };
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return {
+          'exists': false,
+          'message': 'Code d\'adhésion invalide',
+        };
+      }
+      return {
+        'exists': false,
+        'message': 'Erreur lors de la vérification du code',
+      };
     } catch (e) {
-      return false;
+      return {
+        'exists': false,
+        'message': 'Erreur lors de la vérification du code',
+      };
     }
   }
 
@@ -553,15 +633,33 @@ class ApiService {
 
       if (response.statusCode == 200) {
         List<Referral> referrals = [];
+        Map<String, dynamic>? statistiques;
+        
         // Le backend renvoie data: { filleuls: [...], statistiques: {...} }
-        if (response.data['data'] != null && response.data['data']['filleuls'] != null) {
-          referrals = (response.data['data']['filleuls'] as List)
-              .map((json) => Referral.fromJson(json))
-              .toList();
+        if (response.data['data'] != null) {
+          if (response.data['data']['filleuls'] != null) {
+            final filleulsData = response.data['data']['filleuls'] as List;
+            print('DEBUG: Nombre de filleuls brut du backend: ${filleulsData.length}');
+            
+            referrals = filleulsData
+                .map((json) => Referral.fromJson(json))
+                .toList();
+            
+            print('DEBUG: Nombre de filleuls après parsing: ${referrals.length}');
+          }
+          
+          if (response.data['data']['statistiques'] != null) {
+            statistiques = response.data['data']['statistiques'] as Map<String, dynamic>;
+            print('DEBUG: Statistiques du backend: $statistiques');
+          }
         }
+        
         return {
           'success': true,
-          'data': referrals,
+          'data': {
+            'filleuls': referrals,
+            'statistiques': statistiques,
+          },
         };
       } else {
         return {
