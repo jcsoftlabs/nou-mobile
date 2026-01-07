@@ -270,9 +270,6 @@ class _DonScreenState extends State<DonScreen> {
                 hintText: 'Montant du don (HTG)',
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.attach_money,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\\d+\\.?\\d{0,2}')),
-                ],
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Veuillez entrer un montant';
